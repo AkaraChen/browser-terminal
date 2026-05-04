@@ -1,0 +1,18 @@
+[package]
+name = "browser-terminal"
+version = "0.1.0"
+edition = "2024"
+description = "A local browser-based terminal powered by Rust, PTY forwarding, WebSocket, and Xterm.js."
+repository = "https://github.com/AkaraChen/browser-terminal"
+
+[dependencies]
+anyhow = "1"
+axum = { version = "0.8", features = ["ws"] }
+dirs = "6.0.0"
+futures-util = "0.3"
+portable-pty = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "sync"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
