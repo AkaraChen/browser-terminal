@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Browser Terminal</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm/css/xterm.css" />
+    <link id="app-icon" rel="icon" href="data:," />
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body class="grid h-screen grid-rows-[44px_1fr] overflow-hidden bg-zinc-950 text-zinc-100">
@@ -87,6 +88,19 @@
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script>
       const SETTINGS_KEY = "browser-terminal:settings";
+      const ICON_BASE = "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1/icons";
+      const TITLE_ICONS = [
+        ["claude", "claude-color.svg"],
+        ["codex", "codex-color.svg"],
+        ["opencode", "opencode.svg"],
+        ["qoder", "qoder-color.svg"],
+        ["amp", "amp-color.svg"],
+        ["cline", "cline.svg"],
+        ["copilot", "copilot-color.svg"],
+        ["cursor", "cursor.svg"],
+        ["kilo", "kilocode.svg"],
+        ["kimi", "kimi-color.svg"],
+      ];
       const DEFAULT_SETTINGS = {
         fontFamily:
           'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
@@ -111,6 +125,7 @@
       const fontSizeRange = document.getElementById("font-size-range");
       const newTabButton = document.getElementById("new-tab");
       const terminalElement = document.getElementById("terminal");
+      const appIcon = document.getElementById("app-icon");
 
       channelLabel.textContent = channelId;
       window.lucide?.createIcons();
@@ -230,6 +245,12 @@
         fontSizeRange.value = nextSettings.fontSize;
       }
 
+      function syncDocumentTitle(title) {
+        document.title = title || "Browser Terminal";
+        const match = TITLE_ICONS.find(([name]) => document.title.toLowerCase().includes(name));
+        appIcon.href = match ? `${ICON_BASE}/${match[1]}` : "data:,";
+      }
+
       socket.addEventListener("open", () => {
         setStatus("connected");
         sendResize();
@@ -267,6 +288,7 @@
       });
 
       term.onResize(sendResize);
+      term.onTitleChange(syncDocumentTitle);
 
       const resizeObserver = new ResizeObserver(() => {
         fitAddon.fit();

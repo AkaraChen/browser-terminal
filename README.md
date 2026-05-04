@@ -16,6 +16,9 @@ parameter, and opens each new browser tab as a separate terminal session.
 - Settings dialog for terminal font and font size
 - Settings persisted in `localStorage`
 - Live settings sync across open tabs via the browser `storage` event
+- Window title sync from Xterm title updates
+- Dynamic document icon for Claude, Codex, OpenCode, Qoder, Amp, Cline,
+  Copilot, Cursor, Kilo Code, and Kimi terminal titles
 - Tailwind CDN for compact page styling
 
 ## Run
@@ -53,3 +56,4 @@ Shells start in the user's home directory. The PTY implementation uses
 - portable-pty
 - Xterm.js
 - Tailwind CSS CDN
+- LobeHub Icons static SVG CDN
