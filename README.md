@@ -40,7 +40,10 @@ Then open:
 http://127.0.0.1:3000/?channel=main
 ```
 
-The server prints Basic Auth credentials when it starts. The default username is
+When the server listens on a loopback address such as `127.0.0.1` or
+`localhost` and only allows loopback origins, Basic Auth is disabled by default.
+When it listens on a non-loopback address or allows a non-loopback CORS origin,
+the server prints Basic Auth credentials when it starts. The default username is
 `admin`; if no fixed password is configured, a random password is generated for
 that run.
 
@@ -73,7 +76,8 @@ cargo run -- --dangerous-allow-all-host
 
 Basic Auth remains enabled in this mode.
 
-Use `~/.browser-terminalrc` to pin a fixed Basic Auth password:
+Use `~/.browser-terminalrc` to pin a fixed Basic Auth password. A configured
+password also enables Basic Auth when listening on a loopback address:
 
 ```text
 username = admin

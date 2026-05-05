@@ -12,6 +12,11 @@ const GENERATED_PASSWORD_LEN: usize = 24;
 
 #[derive(Clone, Debug)]
 pub(crate) struct BasicAuth {
+    credentials: Option<BasicAuthCredentials>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct BasicAuthCredentials {
     pub(crate) username: String,
     pub(crate) password: String,
     pub(crate) password_source: PasswordSource,
@@ -33,14 +38,38 @@ impl std::fmt::Display for PasswordSource {
 }
 
 impl BasicAuth {
-    pub(crate) fn load() -> Result<Self> {
-        let rc = ConfigFile::load()?;
-        let username = rc
+    pub(crate) fn load(default_requires_auth: bool) -> Result<Self> {
+        let config = ConfigFile::load()?;
+        Ok(Self::from_config(config, default_requires_auth))
+    }
+
+    pub(crate) fn credentials(&self) -> Option<&BasicAuthCredentials> {
+        self.credentials.as_ref()
+    }
+
+    pub(crate) fn allows_headers(&self, headers: &HeaderMap) -> bool {
+        let Some(credentials) = &self.credentials else {
+            return true;
+        };
+
+        credentials.allows_headers(headers)
+    }
+
+    fn from_config(config: Option<ConfigFile>, default_requires_auth: bool) -> Self {
+        let username = config
             .as_ref()
             .and_then(|config| config.username.clone())
             .unwrap_or_else(|| DEFAULT_USERNAME.to_string());
 
-        let (password, password_source) = if let Some(config) = rc {
+        let has_configured_password = config
+            .as_ref()
+            .and_then(|config| config.password.as_ref())
+            .is_some();
+        if !default_requires_auth && !has_configured_password {
+            return Self { credentials: None };
+        }
+
+        let (password, password_source) = if let Some(config) = config {
             if let Some(password) = config.password {
                 (password, PasswordSource::Config(config.path))
             } else {
@@ -50,14 +79,18 @@ impl BasicAuth {
             (generate_password(), PasswordSource::Generated)
         };
 
-        Ok(Self {
-            username,
-            password,
-            password_source,
-        })
+        Self {
+            credentials: Some(BasicAuthCredentials {
+                username,
+                password,
+                password_source,
+            }),
+        }
     }
+}
 
-    pub(crate) fn allows_headers(&self, headers: &HeaderMap) -> bool {
+impl BasicAuthCredentials {
+    fn allows_headers(&self, headers: &HeaderMap) -> bool {
         let Some(value) = headers.get(header::AUTHORIZATION) else {
             return false;
         };
@@ -78,6 +111,23 @@ impl BasicAuth {
         };
 
         username == self.username && password == self.password
+    }
+}
+
+#[cfg(test)]
+impl BasicAuth {
+    fn enabled_for_test(username: &str, password: &str) -> Self {
+        Self {
+            credentials: Some(BasicAuthCredentials {
+                username: username.to_string(),
+                password: password.to_string(),
+                password_source: PasswordSource::Generated,
+            }),
+        }
+    }
+
+    fn disabled_for_test() -> Self {
+        Self { credentials: None }
     }
 }
 
@@ -167,11 +217,7 @@ mod tests {
 
     #[test]
     fn basic_auth_accepts_expected_credentials() {
-        let auth = BasicAuth {
-            username: "admin".to_string(),
-            password: "secret".to_string(),
-            password_source: PasswordSource::Generated,
-        };
+        let auth = BasicAuth::enabled_for_test("admin", "secret");
         let mut headers = HeaderMap::new();
         headers.insert(header::AUTHORIZATION, basic_auth_header("admin", "secret"));
 
@@ -180,12 +226,37 @@ mod tests {
 
     #[test]
     fn basic_auth_rejects_missing_credentials() {
-        let auth = BasicAuth {
-            username: "admin".to_string(),
-            password: "secret".to_string(),
-            password_source: PasswordSource::Generated,
-        };
+        let auth = BasicAuth::enabled_for_test("admin", "secret");
 
+        assert!(!auth.allows_headers(&HeaderMap::new()));
+    }
+
+    #[test]
+    fn disabled_basic_auth_accepts_missing_credentials() {
+        let auth = BasicAuth::disabled_for_test();
+
+        assert!(auth.allows_headers(&HeaderMap::new()));
+    }
+
+    #[test]
+    fn loopback_default_disables_auth_without_configured_password() {
+        let auth = BasicAuth::from_config(None, false);
+
+        assert!(auth.credentials().is_none());
+    }
+
+    #[test]
+    fn configured_password_enables_auth_even_when_loopback_default_is_disabled() {
+        let auth = BasicAuth::from_config(
+            Some(ConfigFile {
+                path: PathBuf::from("/tmp/test-browser-terminalrc"),
+                username: Some("admin".to_string()),
+                password: Some("fixed-password".to_string()),
+            }),
+            false,
+        );
+
+        assert!(auth.credentials().is_some());
         assert!(!auth.allows_headers(&HeaderMap::new()));
     }
 

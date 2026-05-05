@@ -154,6 +154,25 @@ fn parse_authority(value: &str) -> Option<Authority> {
     value.parse::<Authority>().ok()
 }
 
+pub(crate) fn origin_host_is_loopback(origin: &HeaderValue) -> bool {
+    let Ok(origin) = origin.to_str() else {
+        return false;
+    };
+    let Ok(origin) = origin.parse::<Uri>() else {
+        return false;
+    };
+
+    if !matches!(origin.scheme_str(), Some("http" | "https")) {
+        return false;
+    }
+
+    let Some(authority) = origin.authority() else {
+        return false;
+    };
+
+    authority_host_is_loopback(authority)
+}
+
 fn origin_is_loopback_on_port(origin: &HeaderValue, server_port: u16) -> bool {
     let Ok(origin) = origin.to_str() else {
         return false;
