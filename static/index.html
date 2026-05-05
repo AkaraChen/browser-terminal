@@ -1,342 +1,427 @@
 <!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Browser Terminal</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm/css/xterm.css" />
-    <link id="app-icon" rel="icon" href="data:," />
-    <script src="https://cdn.tailwindcss.com"></script>
-  </head>
-  <body class="grid h-screen grid-rows-[44px_1fr] overflow-hidden bg-zinc-950 text-zinc-100">
-    <header class="flex items-center justify-between gap-4 border-b border-zinc-700 bg-zinc-900 px-3">
-      <div class="flex min-w-0 items-center gap-2.5 text-sm text-zinc-400" title="Channel">
-        <span id="status-dot" class="h-2 w-2 shrink-0 rounded-full bg-zinc-500" aria-hidden="true"></span>
-        <span id="channel" class="truncate"></span>
-      </div>
-      <div class="flex shrink-0 items-center gap-2">
-        <button
-          id="settings-button"
-          type="button"
-          aria-label="设置"
-          class="grid size-[30px] place-items-center rounded-md border border-zinc-700 bg-zinc-800 hover:border-emerald-500"
-        >
-          <i data-lucide="settings" class="h-4 w-4" aria-hidden="true"></i>
-        </button>
-        <button
-          id="new-tab"
-          type="button"
-          aria-label="新建 tab"
-          title="新建 tab"
-          class="grid size-[30px] place-items-center rounded-md border border-zinc-700 bg-zinc-800 hover:border-emerald-500"
-        >
-          <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
-        </button>
-      </div>
-    </header>
-    <main id="terminal" class="min-h-0"></main>
-
-    <dialog
-      id="settings-dialog"
-      class="w-[min(92vw,380px)] rounded-lg border border-zinc-700 bg-zinc-900 p-0 text-zinc-100 shadow-2xl backdrop:bg-black/60"
+<html lang="zh-CN" class="bg-[#111318]">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Browser Terminal</title>
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/@xterm/xterm/css/xterm.css"
+        />
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5/400.css"
+        />
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/@fontsource/fira-code@5/400.css"
+        />
+        <link id="app-icon" rel="icon" href="data:," />
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body
+        class="grid h-screen grid-rows-[44px_1fr] overflow-hidden text-zinc-100"
     >
-      <form method="dialog" class="flex items-center justify-between border-b border-zinc-700 px-4 py-3">
-        <h2 class="text-sm font-medium">设置</h2>
-        <button
-          type="submit"
-          aria-label="关闭"
-          class="grid size-8 place-items-center rounded-md text-zinc-300 hover:bg-zinc-800"
+        <header class="flex items-center justify-between gap-4 px-3">
+            <div class="flex items-center gap-2.5 text-sm text-zinc-400">
+                <span
+                    id="status-dot"
+                    class="h-2 w-2 shrink-0 rounded-full bg-zinc-500"
+                    aria-hidden="true"
+                ></span>
+                <span id="status-label">connecting</span>
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
+                <button
+                    id="settings-button"
+                    type="button"
+                    aria-label="设置"
+                    class="grid size-[30px] place-items-center rounded-md border border-zinc-700 bg-zinc-800 hover:border-emerald-500"
+                >
+                    <i
+                        data-lucide="settings"
+                        class="h-4 w-4"
+                        aria-hidden="true"
+                    ></i>
+                </button>
+                <button
+                    id="new-tab"
+                    type="button"
+                    aria-label="新建 tab"
+                    title="新建 tab"
+                    class="grid size-[30px] place-items-center rounded-md border border-zinc-700 bg-zinc-800 hover:border-emerald-500"
+                >
+                    <i
+                        data-lucide="plus"
+                        class="h-4 w-4"
+                        aria-hidden="true"
+                    ></i>
+                </button>
+            </div>
+        </header>
+        <main class="min-h-0 px-3 pb-3">
+            <div id="terminal" class="h-full min-h-0"></div>
+        </main>
+
+        <dialog
+            id="settings-dialog"
+            class="w-[min(92vw,380px)] rounded-lg border border-zinc-700 bg-zinc-900 p-0 text-zinc-100 shadow-2xl backdrop:bg-black/60"
         >
-          <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-        </button>
-      </form>
-      <div class="grid gap-4 p-4">
-        <label class="grid gap-2 text-sm text-zinc-300">
-          <span>字体</span>
-          <select
-            id="font-family"
-            class="h-9 rounded-md border border-zinc-700 bg-zinc-950 px-3 text-zinc-100 outline-none focus:border-emerald-500"
-          >
-            <option value='ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace'>
-              系统等宽
-            </option>
-            <option value='Menlo, Monaco, Consolas, "Liberation Mono", monospace'>Menlo</option>
-            <option value='"JetBrains Mono", Menlo, Monaco, Consolas, monospace'>JetBrains Mono</option>
-            <option value='"Fira Code", Menlo, Monaco, Consolas, monospace'>Fira Code</option>
-            <option value='Consolas, "Liberation Mono", monospace'>Consolas</option>
-          </select>
-        </label>
-        <label class="grid gap-2 text-sm text-zinc-300">
-          <span>字体大小</span>
-          <div class="grid grid-cols-[1fr_76px] gap-3">
-            <input id="font-size-range" type="range" min="10" max="28" step="1" class="w-full accent-emerald-500" />
-            <input
-              id="font-size"
-              type="number"
-              min="10"
-              max="28"
-              step="1"
-              class="h-9 rounded-md border border-zinc-700 bg-zinc-950 px-2 text-zinc-100 outline-none focus:border-emerald-500"
-            />
-          </div>
-        </label>
-      </div>
-    </dialog>
+            <form
+                method="dialog"
+                class="flex items-center justify-between border-b border-zinc-700 px-4 py-3"
+            >
+                <h2 class="text-sm font-medium">设置</h2>
+                <button
+                    type="submit"
+                    aria-label="关闭"
+                    class="grid size-8 place-items-center rounded-md text-zinc-300 hover:bg-zinc-800"
+                >
+                    <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
+                </button>
+            </form>
+            <div class="grid gap-4 p-4">
+                <label class="grid gap-2 text-sm text-zinc-300">
+                    <span>字体</span>
+                    <select
+                        id="font-family"
+                        class="h-9 rounded-md border border-zinc-700 bg-zinc-950 px-3 text-zinc-100 outline-none focus:border-emerald-500"
+                    >
+                        <option
+                            value='ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace'
+                        >
+                            系统等宽
+                        </option>
+                        <option
+                            value='Menlo, Monaco, Consolas, "Liberation Mono", monospace'
+                        >
+                            Menlo
+                        </option>
+                        <option
+                            value='"JetBrains Mono", Menlo, Monaco, Consolas, monospace'
+                        >
+                            JetBrains Mono
+                        </option>
+                        <option
+                            value='"Fira Code", Menlo, Monaco, Consolas, monospace'
+                        >
+                            Fira Code
+                        </option>
+                        <option value='Consolas, "Liberation Mono", monospace'>
+                            Consolas
+                        </option>
+                    </select>
+                </label>
+                <label class="grid gap-2 text-sm text-zinc-300">
+                    <span>字体大小</span>
+                    <div class="grid grid-cols-[1fr_76px] gap-3">
+                        <input
+                            id="font-size-range"
+                            type="range"
+                            min="10"
+                            max="28"
+                            step="1"
+                            class="w-full accent-emerald-500"
+                        />
+                        <input
+                            id="font-size"
+                            type="number"
+                            min="10"
+                            max="28"
+                            step="1"
+                            class="h-9 rounded-md border border-zinc-700 bg-zinc-950 px-2 text-zinc-100 outline-none focus:border-emerald-500"
+                        />
+                    </div>
+                </label>
+            </div>
+        </dialog>
 
-    <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm/lib/xterm.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit/lib/addon-fit.js"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-    <script>
-      const SETTINGS_KEY = "browser-terminal:settings";
-      const ICON_BASE = "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1/icons";
-      const TITLE_ICONS = [
-        ["claude", "claude-color.svg"],
-        ["codex", "codex-color.svg"],
-        ["opencode", "opencode.svg"],
-        ["qoder", "qoder-color.svg"],
-        ["amp", "amp-color.svg"],
-        ["cline", "cline.svg"],
-        ["copilot", "copilot-color.svg"],
-        ["cursor", "cursor.svg"],
-        ["kilo", "kilocode.svg"],
-        ["kimi", "kimi-color.svg"],
-      ];
-      const DEFAULT_SETTINGS = {
-        fontFamily:
-          'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-        fontSize: 14,
-      };
-      const params = new URLSearchParams(window.location.search);
-      let channelId = params.get("channel") || params.get("channel_id");
+        <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm/lib/xterm.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit/lib/addon-fit.js"></script>
+        <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+        <script>
+            const SETTINGS_KEY = "browser-terminal:settings";
+            const ICON_BASE =
+                "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1/icons";
+            const TITLE_ICONS = [
+                ["claude", "claude-color.svg"],
+                ["codex", "codex-color.svg"],
+                ["opencode", "opencode.svg"],
+                ["qoder", "qoder-color.svg"],
+                ["amp", "amp-color.svg"],
+                ["cline", "cline.svg"],
+                ["copilot", "copilot-color.svg"],
+                ["cursor", "cursor.svg"],
+                ["kilo", "kilocode.svg"],
+                ["kimi", "kimi-color.svg"],
+            ];
+            const DEFAULT_SETTINGS = {
+                fontFamily:
+                    'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+                fontSize: 14,
+            };
+            const params = new URLSearchParams(window.location.search);
+            let channelId = params.get("channel") || params.get("channel_id");
 
-      if (!channelId) {
-        channelId = crypto.randomUUID();
-        const nextUrl = new URL(window.location.href);
-        nextUrl.searchParams.set("channel", channelId);
-        window.history.replaceState(null, "", nextUrl);
-      }
+            if (!channelId) {
+                channelId = crypto.randomUUID();
+                const nextUrl = new URL(window.location.href);
+                nextUrl.searchParams.set("channel", channelId);
+                window.history.replaceState(null, "", nextUrl);
+            }
 
-      const channelLabel = document.getElementById("channel");
-      const statusDot = document.getElementById("status-dot");
-      const settingsButton = document.getElementById("settings-button");
-      const settingsDialog = document.getElementById("settings-dialog");
-      const fontFamilyInput = document.getElementById("font-family");
-      const fontSizeInput = document.getElementById("font-size");
-      const fontSizeRange = document.getElementById("font-size-range");
-      const newTabButton = document.getElementById("new-tab");
-      const terminalElement = document.getElementById("terminal");
-      const appIcon = document.getElementById("app-icon");
+            const statusLabel = document.getElementById("status-label");
+            const statusDot = document.getElementById("status-dot");
+            const settingsButton = document.getElementById("settings-button");
+            const settingsDialog = document.getElementById("settings-dialog");
+            const fontFamilyInput = document.getElementById("font-family");
+            const fontSizeInput = document.getElementById("font-size");
+            const fontSizeRange = document.getElementById("font-size-range");
+            const newTabButton = document.getElementById("new-tab");
+            const terminalElement = document.getElementById("terminal");
+            const appIcon = document.getElementById("app-icon");
 
-      channelLabel.textContent = channelId;
-      window.lucide?.createIcons();
-      let settings = readSettings();
+            window.lucide?.createIcons();
+            let settings = readSettings();
 
-      const term = new Terminal({
-        cursorBlink: true,
-        convertEol: true,
-        fontFamily: settings.fontFamily,
-        fontSize: settings.fontSize,
-        lineHeight: 1.1,
-        scrollback: 5000,
-        theme: {
-          background: "#111318",
-          foreground: "#e9edf3",
-          cursor: "#e9edf3",
-          selectionBackground: "#3f5268",
-          black: "#111318",
-          red: "#e06c75",
-          green: "#98c379",
-          yellow: "#e5c07b",
-          blue: "#61afef",
-          magenta: "#c678dd",
-          cyan: "#56b6c2",
-          white: "#d7dae0",
-          brightBlack: "#5c6370",
-          brightRed: "#e06c75",
-          brightGreen: "#98c379",
-          brightYellow: "#e5c07b",
-          brightBlue: "#61afef",
-          brightMagenta: "#c678dd",
-          brightCyan: "#56b6c2",
-          brightWhite: "#ffffff",
-        },
-      });
-      const fitAddon = new FitAddon.FitAddon();
-      const encoder = new TextEncoder();
+            const term = new Terminal({
+                cursorBlink: true,
+                convertEol: true,
+                fontFamily: settings.fontFamily,
+                fontSize: settings.fontSize,
+                lineHeight: 1.1,
+                scrollback: 5000,
+                theme: {
+                    background: "#111318",
+                    foreground: "#e9edf3",
+                    cursor: "#e9edf3",
+                    selectionBackground: "#3f5268",
+                    black: "#111318",
+                    red: "#e06c75",
+                    green: "#98c379",
+                    yellow: "#e5c07b",
+                    blue: "#61afef",
+                    magenta: "#c678dd",
+                    cyan: "#56b6c2",
+                    white: "#d7dae0",
+                    brightBlack: "#5c6370",
+                    brightRed: "#e06c75",
+                    brightGreen: "#98c379",
+                    brightYellow: "#e5c07b",
+                    brightBlue: "#61afef",
+                    brightMagenta: "#c678dd",
+                    brightCyan: "#56b6c2",
+                    brightWhite: "#ffffff",
+                },
+            });
+            const fitAddon = new FitAddon.FitAddon();
+            const encoder = new TextEncoder();
 
-      term.loadAddon(fitAddon);
-      term.open(terminalElement);
-      term.element?.classList.add("h-full");
-      fitAddon.fit();
-      term.focus();
-      syncSettingsForm(settings);
+            term.loadAddon(fitAddon);
+            term.open(terminalElement);
+            term.element?.classList.add("h-full");
+            fitAddon.fit();
+            term.focus();
+            syncSettingsForm(settings);
 
-      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const socket = new WebSocket(
-        `${wsProtocol}//${window.location.host}/ws/${encodeURIComponent(channelId)}`,
-      );
-      socket.binaryType = "arraybuffer";
+            const wsProtocol =
+                window.location.protocol === "https:" ? "wss:" : "ws:";
+            const socket = new WebSocket(
+                `${wsProtocol}//${window.location.host}/ws/${encodeURIComponent(channelId)}`,
+            );
+            socket.binaryType = "arraybuffer";
 
-      function setStatus(state) {
-        statusDot.className =
-          "h-2 w-2 shrink-0 rounded-full " +
-          (state === "connected"
-            ? "bg-emerald-400"
-            : state === "disconnected"
-              ? "bg-red-400"
-              : "bg-zinc-500");
-      }
+            function setStatus(state) {
+                statusDot.className =
+                    "h-2 w-2 shrink-0 rounded-full " +
+                    (state === "connected"
+                        ? "bg-emerald-400"
+                        : state === "disconnected"
+                          ? "bg-red-400"
+                          : "bg-zinc-500");
+                statusLabel.textContent =
+                    state === "connected"
+                        ? "connected"
+                        : state === "disconnected"
+                          ? "disconnected"
+                          : "connecting";
+            }
 
-      function sendResize() {
-        if (socket.readyState !== WebSocket.OPEN) return;
-        socket.send(
-          JSON.stringify({
-            type: "resize",
-            cols: term.cols,
-            rows: term.rows,
-          }),
-        );
-      }
+            function sendResize() {
+                if (socket.readyState !== WebSocket.OPEN) return;
+                socket.send(
+                    JSON.stringify({
+                        type: "resize",
+                        cols: term.cols,
+                        rows: term.rows,
+                    }),
+                );
+            }
 
-      function readSettings() {
-        try {
-          const raw = localStorage.getItem(SETTINGS_KEY);
-          if (!raw) return { ...DEFAULT_SETTINGS };
+            function readSettings() {
+                try {
+                    const raw = localStorage.getItem(SETTINGS_KEY);
+                    if (!raw) return { ...DEFAULT_SETTINGS };
 
-          const parsed = JSON.parse(raw);
-          return normalizeSettings(parsed);
-        } catch {
-          return { ...DEFAULT_SETTINGS };
-        }
-      }
+                    const parsed = JSON.parse(raw);
+                    return normalizeSettings(parsed);
+                } catch {
+                    return { ...DEFAULT_SETTINGS };
+                }
+            }
 
-      function normalizeSettings(value) {
-        const fontFamily =
-          typeof value?.fontFamily === "string" && value.fontFamily.trim()
-            ? value.fontFamily
-            : DEFAULT_SETTINGS.fontFamily;
-        const fontSize = Number.parseInt(value?.fontSize, 10);
+            function normalizeSettings(value) {
+                const fontFamily =
+                    typeof value?.fontFamily === "string" &&
+                    value.fontFamily.trim()
+                        ? value.fontFamily
+                        : DEFAULT_SETTINGS.fontFamily;
+                const fontSize = Number.parseInt(value?.fontSize, 10);
 
-        return {
-          fontFamily,
-          fontSize: Number.isFinite(fontSize) ? Math.min(28, Math.max(10, fontSize)) : DEFAULT_SETTINGS.fontSize,
-        };
-      }
+                return {
+                    fontFamily,
+                    fontSize: Number.isFinite(fontSize)
+                        ? Math.min(28, Math.max(10, fontSize))
+                        : DEFAULT_SETTINGS.fontSize,
+                };
+            }
 
-      function saveSettings(nextSettings, options = {}) {
-        settings = normalizeSettings(nextSettings);
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-        applySettings(settings);
-        if (options.syncForm !== false) {
-          syncSettingsForm(settings);
-        }
-      }
+            function saveSettings(nextSettings, options = {}) {
+                settings = normalizeSettings(nextSettings);
+                localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+                applySettings(settings);
+                if (options.syncForm !== false) {
+                    syncSettingsForm(settings);
+                }
+            }
 
-      function applySettings(nextSettings) {
-        term.options.fontFamily = nextSettings.fontFamily;
-        term.options.fontSize = nextSettings.fontSize;
-        fitAddon.fit();
-        sendResize();
-      }
+            function applySettings(nextSettings) {
+                term.options.fontFamily = nextSettings.fontFamily;
+                term.options.fontSize = nextSettings.fontSize;
+                const fontReady =
+                    document.fonts?.load(
+                        `${nextSettings.fontSize}px ${nextSettings.fontFamily}`,
+                    ) ?? Promise.resolve();
 
-      function syncSettingsForm(nextSettings) {
-        fontFamilyInput.value = nextSettings.fontFamily;
-        fontSizeInput.value = nextSettings.fontSize;
-        fontSizeRange.value = nextSettings.fontSize;
-      }
+                fontReady
+                    .catch(() => {})
+                    .finally(() => {
+                        requestAnimationFrame(() => {
+                            fitAddon.fit();
+                            term.refresh(0, term.rows - 1);
+                            sendResize();
+                        });
+                    });
+            }
 
-      function syncDocumentTitle(title) {
-        document.title = title || "Browser Terminal";
-        const match = TITLE_ICONS.find(([name]) => document.title.toLowerCase().includes(name));
-        appIcon.href = match ? `${ICON_BASE}/${match[1]}` : "data:,";
-      }
+            function syncSettingsForm(nextSettings) {
+                fontFamilyInput.value = nextSettings.fontFamily;
+                fontSizeInput.value = nextSettings.fontSize;
+                fontSizeRange.value = nextSettings.fontSize;
+            }
 
-      socket.addEventListener("open", () => {
-        setStatus("connected");
-        sendResize();
-        term.focus();
-      });
+            function syncDocumentTitle(title) {
+                document.title = title || "Browser Terminal";
+                const match = TITLE_ICONS.find(([name]) =>
+                    document.title.toLowerCase().includes(name),
+                );
+                appIcon.href = match ? `${ICON_BASE}/${match[1]}` : "data:,";
+            }
 
-      socket.addEventListener("message", (event) => {
-        if (event.data instanceof ArrayBuffer) {
-          term.write(new Uint8Array(event.data));
-          return;
-        }
+            socket.addEventListener("open", () => {
+                setStatus("connected");
+                sendResize();
+                term.focus();
+            });
 
-        if (event.data instanceof Blob) {
-          event.data.arrayBuffer().then((buffer) => term.write(new Uint8Array(buffer)));
-          return;
-        }
+            socket.addEventListener("message", (event) => {
+                if (event.data instanceof ArrayBuffer) {
+                    term.write(new Uint8Array(event.data));
+                    return;
+                }
 
-        term.write(event.data);
-      });
+                if (event.data instanceof Blob) {
+                    event.data
+                        .arrayBuffer()
+                        .then((buffer) => term.write(new Uint8Array(buffer)));
+                    return;
+                }
 
-      socket.addEventListener("close", () => {
-        setStatus("disconnected");
-        term.writeln("");
-        term.writeln("[disconnected]");
-      });
+                term.write(event.data);
+            });
 
-      socket.addEventListener("error", () => {
-        setStatus("disconnected");
-      });
+            socket.addEventListener("close", () => {
+                setStatus("disconnected");
+                term.writeln("");
+                term.writeln("[disconnected]");
+            });
 
-      term.onData((data) => {
-        if (socket.readyState === WebSocket.OPEN) {
-          socket.send(encoder.encode(data));
-        }
-      });
+            socket.addEventListener("error", () => {
+                setStatus("disconnected");
+            });
 
-      term.onResize(sendResize);
-      term.onTitleChange(syncDocumentTitle);
+            term.onData((data) => {
+                if (socket.readyState === WebSocket.OPEN) {
+                    socket.send(encoder.encode(data));
+                }
+            });
 
-      const resizeObserver = new ResizeObserver(() => {
-        fitAddon.fit();
-        sendResize();
-      });
-      resizeObserver.observe(terminalElement);
+            term.onResize(sendResize);
+            term.onTitleChange(syncDocumentTitle);
 
-      settingsButton.addEventListener("click", () => {
-        syncSettingsForm(settings);
-        settingsDialog.showModal();
-      });
+            const resizeObserver = new ResizeObserver(() => {
+                fitAddon.fit();
+                sendResize();
+            });
+            resizeObserver.observe(terminalElement);
 
-      fontFamilyInput.addEventListener("change", () => {
-        saveSettings({ ...settings, fontFamily: fontFamilyInput.value });
-      });
+            settingsButton.addEventListener("click", () => {
+                syncSettingsForm(settings);
+                settingsDialog.showModal();
+            });
 
-      fontSizeInput.addEventListener("focus", () => {
-        fontSizeInput.select();
-      });
+            fontFamilyInput.addEventListener("change", () => {
+                saveSettings({
+                    ...settings,
+                    fontFamily: fontFamilyInput.value,
+                });
+            });
 
-      fontSizeInput.addEventListener("input", () => {
-        if (!fontSizeInput.value) return;
+            fontSizeInput.addEventListener("focus", () => {
+                fontSizeInput.select();
+            });
 
-        saveSettings({ ...settings, fontSize: fontSizeInput.value }, { syncForm: false });
-        fontSizeRange.value = settings.fontSize;
-      });
+            fontSizeInput.addEventListener("input", () => {
+                if (!fontSizeInput.value) return;
 
-      fontSizeInput.addEventListener("change", () => {
-        syncSettingsForm(settings);
-      });
+                saveSettings(
+                    { ...settings, fontSize: fontSizeInput.value },
+                    { syncForm: false },
+                );
+                fontSizeRange.value = settings.fontSize;
+            });
 
-      fontSizeRange.addEventListener("input", () => {
-        saveSettings({ ...settings, fontSize: fontSizeRange.value });
-      });
+            fontSizeInput.addEventListener("change", () => {
+                syncSettingsForm(settings);
+            });
 
-      window.addEventListener("storage", (event) => {
-        if (event.key !== SETTINGS_KEY) return;
+            fontSizeRange.addEventListener("input", () => {
+                saveSettings({ ...settings, fontSize: fontSizeRange.value });
+            });
 
-        settings = readSettings();
-        applySettings(settings);
-        syncSettingsForm(settings);
-      });
+            window.addEventListener("storage", (event) => {
+                if (event.key !== SETTINGS_KEY) return;
 
-      newTabButton.addEventListener("click", () => {
-        const nextUrl = new URL(window.location.href);
-        nextUrl.searchParams.set("channel", crypto.randomUUID());
-        window.open(nextUrl.toString(), "_blank", "noopener");
-      });
-    </script>
-  </body>
+                settings = readSettings();
+                applySettings(settings);
+                syncSettingsForm(settings);
+            });
+
+            newTabButton.addEventListener("click", () => {
+                const nextUrl = new URL(window.location.href);
+                nextUrl.searchParams.set("channel", crypto.randomUUID());
+                window.open(nextUrl.toString(), "_blank", "noopener");
+            });
+        </script>
+    </body>
 </html>
