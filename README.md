@@ -5,11 +5,17 @@ A small local terminal server that lets the browser act as a terminal window man
 The Rust backend serves a single HTML page and forwards WebSocket traffic to an
 independent PTY session. The frontend uses Xterm.js, reads a `channel` query
 parameter, and opens each new browser tab as a separate terminal session.
+Files under `static/` are embedded into the Rust binary at build time.
+The frontend entrypoint is `static/app.js`, split into ES modules under
+`static/js/`, with Alpine.js stores and components handling the browser UI
+bindings.
 
 ## Features
 
 - Browser terminal UI powered by Xterm.js
 - Rust WebSocket backend using Axum
+- Static assets embedded into the Rust binary
+- Alpine.js UI bindings with frontend scripts split into ES modules
 - One PTY session per WebSocket connection
 - `?channel=<id>` URL-based session identity
 - New-tab button for opening a fresh terminal session
@@ -92,6 +98,8 @@ Shells start in the user's home directory. The PTY implementation uses
 - Axum
 - Tokio
 - portable-pty
+- include_dir
+- Alpine.js
 - Xterm.js
 - Xterm.js Web Fonts addon
 - Tailwind CSS CDN

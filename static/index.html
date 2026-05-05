@@ -15,19 +15,25 @@
         class="grid h-screen grid-rows-[44px_1fr] overflow-hidden bg-[#111318] text-zinc-100"
     >
         <header class="flex items-center justify-between gap-4 px-3">
-            <div class="flex items-center gap-2.5 text-sm text-zinc-400">
+            <div
+                x-data="connectionStatus"
+                class="flex items-center gap-2.5 text-sm text-zinc-400"
+            >
                 <span
-                    id="status-dot"
-                    class="h-2 w-2 shrink-0 rounded-full bg-zinc-500"
+                    class="h-2 w-2 shrink-0 rounded-full"
+                    :class="statusClass"
                     aria-hidden="true"
                 ></span>
-                <span id="status-label">connecting</span>
+                <span x-text="label">connecting</span>
             </div>
-            <div class="flex shrink-0 items-center gap-2">
+            <div
+                x-data="terminalToolbar"
+                class="flex shrink-0 items-center gap-2"
+            >
                 <button
-                    id="settings-button"
                     type="button"
                     aria-label="设置"
+                    @click="openSettings"
                     class="grid size-[30px] place-items-center rounded-md border border-zinc-700 bg-zinc-800 hover:border-emerald-500"
                 >
                     <i
@@ -37,10 +43,10 @@
                     ></i>
                 </button>
                 <button
-                    id="new-tab"
                     type="button"
                     aria-label="新建 tab"
                     title="新建 tab"
+                    @click="openNewTab"
                     class="grid size-[30px] place-items-center rounded-md border border-zinc-700 bg-zinc-800 hover:border-emerald-500"
                 >
                     <i
@@ -51,12 +57,14 @@
                 </button>
             </div>
         </header>
-        <main class="min-h-0 px-3 pb-3">
-            <div id="terminal" class="h-full min-h-0"></div>
+        <main x-data="terminalPane" class="min-h-0 px-3 pb-3">
+            <div x-ref="terminal" class="h-full min-h-0"></div>
         </main>
 
         <dialog
-            id="settings-dialog"
+            x-data="settingsDialog"
+            x-ref="dialog"
+            @settings-open.window="open"
             class="w-[min(92vw,380px)] rounded-lg border border-zinc-700 bg-zinc-900 p-0 text-zinc-100 shadow-2xl backdrop:bg-black/60"
         >
             <form
@@ -76,7 +84,8 @@
                 <label class="grid gap-2 text-sm text-zinc-300">
                     <span>字体</span>
                     <select
-                        id="font-family"
+                        x-model="$store.terminal.settings.fontFamily"
+                        @change="updateFontFamily($event.target.value)"
                         class="h-9 rounded-md border border-zinc-700 bg-zinc-950 px-3 text-zinc-100 outline-none focus:border-emerald-500"
                     >
                         <option value="JetBrainsMono Nerd Font">
@@ -96,19 +105,23 @@
                     <span>字体大小</span>
                     <div class="grid grid-cols-[1fr_76px] gap-3">
                         <input
-                            id="font-size-range"
                             type="range"
                             min="10"
                             max="28"
                             step="1"
+                            x-model.number="$store.terminal.settings.fontSize"
+                            @input="updateFontSize($event.target.value)"
                             class="w-full accent-emerald-500"
                         />
                         <input
-                            id="font-size"
                             type="number"
                             min="10"
                             max="28"
                             step="1"
+                            x-model="$store.terminal.fontSizeInput"
+                            @focus="$event.target.select()"
+                            @input="updateFontSizeInput($event.target.value)"
+                            @change="syncSettingsForm"
                             class="h-9 rounded-md border border-zinc-700 bg-zinc-950 px-2 text-zinc-100 outline-none focus:border-emerald-500"
                         />
                     </div>
@@ -120,335 +133,6 @@
         <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit/lib/addon-fit.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-fonts@0.1.0/lib/addon-web-fonts.js"></script>
         <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-        <script>
-            const SETTINGS_KEY = "browser-terminal:settings";
-            const ICON_BASE =
-                "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1/icons";
-            const TITLE_ICONS = [
-                ["claude", "claude-color.svg"],
-                ["codex", "codex-color.svg"],
-                ["opencode", "opencode.svg"],
-                ["qoder", "qoder-color.svg"],
-                ["amp", "amp-color.svg"],
-                ["cline", "cline.svg"],
-                ["copilot", "copilot-color.svg"],
-                ["cursor", "cursor.svg"],
-                ["kilo", "kilocode.svg"],
-                ["kimi", "kimi-color.svg"],
-            ];
-            const NERD_FONTS_BASE =
-                "https://cdn.jsdelivr.net/gh/ryanoasis/nerd-fonts@v3.3.0/patched-fonts";
-            const SYSTEM_FONT =
-                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace';
-            const TERMINAL_FONTS = [
-                {
-                    label: "JetBrainsMono Nerd Font",
-                    family: "JetBrainsMono Nerd Font",
-                    face: new FontFace(
-                        "JetBrainsMono Nerd Font",
-                        `url(${NERD_FONTS_BASE}/JetBrainsMono/Ligatures/Regular/JetBrainsMonoNerdFont-Regular.ttf)`,
-                    ),
-                },
-                {
-                    label: "MesloLGM Nerd Font",
-                    family: "MesloLGM Nerd Font",
-                    face: new FontFace(
-                        "MesloLGM Nerd Font",
-                        `url(${NERD_FONTS_BASE}/Meslo/M/Regular/MesloLGMNerdFont-Regular.ttf)`,
-                    ),
-                },
-                {
-                    label: "系统等宽",
-                    family: SYSTEM_FONT,
-                },
-            ];
-            const DEFAULT_SETTINGS = {
-                fontFamily: TERMINAL_FONTS[0].family,
-                fontSize: 14,
-            };
-            const params = new URLSearchParams(window.location.search);
-            let channelId = params.get("channel") || params.get("channel_id");
-
-            if (!channelId) {
-                channelId = crypto.randomUUID();
-                const nextUrl = new URL(window.location.href);
-                nextUrl.searchParams.set("channel", channelId);
-                window.history.replaceState(null, "", nextUrl);
-            }
-
-            const statusLabel = document.getElementById("status-label");
-            const statusDot = document.getElementById("status-dot");
-            const settingsButton = document.getElementById("settings-button");
-            const settingsDialog = document.getElementById("settings-dialog");
-            const fontFamilyInput = document.getElementById("font-family");
-            const fontSizeInput = document.getElementById("font-size");
-            const fontSizeRange = document.getElementById("font-size-range");
-            const newTabButton = document.getElementById("new-tab");
-            const terminalElement = document.getElementById("terminal");
-            const appIcon = document.getElementById("app-icon");
-
-            window.lucide?.createIcons();
-            let settings = readSettings();
-
-            const term = new Terminal({
-                cursorBlink: true,
-                convertEol: true,
-                fontFamily: settings.fontFamily,
-                fontSize: settings.fontSize,
-                lineHeight: 1.1,
-                scrollback: 5000,
-                theme: {
-                    background: "#111318",
-                    foreground: "#e9edf3",
-                    cursor: "#e9edf3",
-                    selectionBackground: "#3f5268",
-                    black: "#111318",
-                    red: "#e06c75",
-                    green: "#98c379",
-                    yellow: "#e5c07b",
-                    blue: "#61afef",
-                    magenta: "#c678dd",
-                    cyan: "#56b6c2",
-                    white: "#d7dae0",
-                    brightBlack: "#5c6370",
-                    brightRed: "#e06c75",
-                    brightGreen: "#98c379",
-                    brightYellow: "#e5c07b",
-                    brightBlue: "#61afef",
-                    brightMagenta: "#c678dd",
-                    brightCyan: "#56b6c2",
-                    brightWhite: "#ffffff",
-                },
-            });
-            const fitAddon = new FitAddon.FitAddon();
-            const webFontsAddon = new WebFontsAddon.WebFontsAddon(false);
-            const encoder = new TextEncoder();
-            let socket;
-
-            term.loadAddon(fitAddon);
-            term.loadAddon(webFontsAddon);
-            bootTerminal();
-
-            async function bootTerminal() {
-                await loadTerminalFont(settings.fontFamily);
-                term.open(terminalElement);
-                term.element?.classList.add("h-full");
-                fitAddon.fit();
-                term.focus();
-                syncSettingsForm(settings);
-                connectSocket();
-            }
-
-            function connectSocket() {
-                const wsProtocol =
-                    window.location.protocol === "https:" ? "wss:" : "ws:";
-                socket = new WebSocket(
-                    `${wsProtocol}//${window.location.host}/ws/${encodeURIComponent(channelId)}`,
-                );
-                socket.binaryType = "arraybuffer";
-
-                socket.addEventListener("open", () => {
-                    setStatus("connected");
-                    sendResize();
-                    term.focus();
-                });
-
-                socket.addEventListener("message", (event) => {
-                    if (event.data instanceof ArrayBuffer) {
-                        term.write(new Uint8Array(event.data));
-                        return;
-                    }
-
-                    if (event.data instanceof Blob) {
-                        event.data
-                            .arrayBuffer()
-                            .then((buffer) =>
-                                term.write(new Uint8Array(buffer)),
-                            );
-                        return;
-                    }
-
-                    term.write(event.data);
-                });
-
-                socket.addEventListener("close", () => {
-                    setStatus("disconnected");
-                    term.writeln("");
-                    term.writeln("[disconnected]");
-                });
-
-                socket.addEventListener("error", () => {
-                    setStatus("disconnected");
-                });
-            }
-
-            function setStatus(state) {
-                statusDot.className =
-                    "h-2 w-2 shrink-0 rounded-full " +
-                    (state === "connected"
-                        ? "bg-emerald-400"
-                        : state === "disconnected"
-                          ? "bg-red-400"
-                          : "bg-zinc-500");
-                statusLabel.textContent =
-                    state === "connected"
-                        ? "connected"
-                        : state === "disconnected"
-                          ? "disconnected"
-                          : "connecting";
-            }
-
-            function sendResize() {
-                if (socket?.readyState !== WebSocket.OPEN) return;
-                socket.send(
-                    JSON.stringify({
-                        type: "resize",
-                        cols: term.cols,
-                        rows: term.rows,
-                    }),
-                );
-            }
-
-            function readSettings() {
-                try {
-                    const raw = localStorage.getItem(SETTINGS_KEY);
-                    if (!raw) return { ...DEFAULT_SETTINGS };
-
-                    const parsed = JSON.parse(raw);
-                    return normalizeSettings(parsed);
-                } catch {
-                    return { ...DEFAULT_SETTINGS };
-                }
-            }
-
-            function normalizeSettings(value) {
-                const fontFamily = TERMINAL_FONTS.some(
-                    (font) => font.family === value?.fontFamily,
-                )
-                    ? value.fontFamily
-                    : DEFAULT_SETTINGS.fontFamily;
-                const fontSize = Number.parseInt(value?.fontSize, 10);
-
-                return {
-                    fontFamily,
-                    fontSize: Number.isFinite(fontSize)
-                        ? Math.min(28, Math.max(10, fontSize))
-                        : DEFAULT_SETTINGS.fontSize,
-                };
-            }
-
-            function saveSettings(nextSettings, options = {}) {
-                settings = normalizeSettings(nextSettings);
-                localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-                applySettings(settings);
-                if (options.syncForm !== false) {
-                    syncSettingsForm(settings);
-                }
-            }
-
-            async function loadTerminalFont(fontFamily) {
-                const font = TERMINAL_FONTS.find(
-                    (font) => font.family === fontFamily,
-                );
-                if (!font?.face) return true;
-
-                try {
-                    await webFontsAddon.loadFonts([font.face]);
-                    return true;
-                } catch {
-                    return false;
-                }
-            }
-
-            async function applySettings(nextSettings) {
-                const loaded = await loadTerminalFont(nextSettings.fontFamily);
-                term.options.fontFamily = loaded
-                    ? nextSettings.fontFamily
-                    : SYSTEM_FONT;
-                term.options.fontSize = nextSettings.fontSize;
-                requestAnimationFrame(() => {
-                    fitAddon.fit();
-                    term.refresh(0, term.rows - 1);
-                    sendResize();
-                });
-            }
-
-            function syncSettingsForm(nextSettings) {
-                fontFamilyInput.value = nextSettings.fontFamily;
-                fontSizeInput.value = nextSettings.fontSize;
-                fontSizeRange.value = nextSettings.fontSize;
-            }
-
-            function syncDocumentTitle(title) {
-                document.title = title || "Browser Terminal";
-                const match = TITLE_ICONS.find(([name]) =>
-                    document.title.toLowerCase().includes(name),
-                );
-                appIcon.href = match ? `${ICON_BASE}/${match[1]}` : "data:,";
-            }
-
-            term.onData((data) => {
-                if (socket?.readyState === WebSocket.OPEN) {
-                    socket.send(encoder.encode(data));
-                }
-            });
-
-            term.onResize(sendResize);
-            term.onTitleChange(syncDocumentTitle);
-
-            const resizeObserver = new ResizeObserver(() => {
-                fitAddon.fit();
-                sendResize();
-            });
-            resizeObserver.observe(terminalElement);
-
-            settingsButton.addEventListener("click", () => {
-                syncSettingsForm(settings);
-                settingsDialog.showModal();
-            });
-
-            fontFamilyInput.addEventListener("change", () => {
-                saveSettings({
-                    ...settings,
-                    fontFamily: fontFamilyInput.value,
-                });
-            });
-
-            fontSizeInput.addEventListener("focus", () => {
-                fontSizeInput.select();
-            });
-
-            fontSizeInput.addEventListener("input", () => {
-                if (!fontSizeInput.value) return;
-
-                saveSettings(
-                    { ...settings, fontSize: fontSizeInput.value },
-                    { syncForm: false },
-                );
-                fontSizeRange.value = settings.fontSize;
-            });
-
-            fontSizeInput.addEventListener("change", () => {
-                syncSettingsForm(settings);
-            });
-
-            fontSizeRange.addEventListener("input", () => {
-                saveSettings({ ...settings, fontSize: fontSizeRange.value });
-            });
-
-            window.addEventListener("storage", (event) => {
-                if (event.key !== SETTINGS_KEY) return;
-
-                settings = readSettings();
-                applySettings(settings);
-                syncSettingsForm(settings);
-            });
-
-            newTabButton.addEventListener("click", () => {
-                const nextUrl = new URL(window.location.href);
-                nextUrl.searchParams.set("channel", crypto.randomUUID());
-                window.open(nextUrl.toString(), "_blank", "noopener");
-            });
-        </script>
+        <script type="module" src="/app.js"></script>
     </body>
 </html>

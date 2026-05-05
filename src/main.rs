@@ -10,18 +10,20 @@ use std::{
 use anyhow::{Context, Result};
 use axum::{
     Router,
+    body::Body,
     extract::{
         Path, Request, WebSocketUpgrade,
         ws::{Message, WebSocket},
     },
     http::{HeaderMap, HeaderValue, Method, StatusCode, Uri, header, uri::Authority},
     middleware::{self, Next},
-    response::{Html, IntoResponse, Response},
+    response::{IntoResponse, Response},
     routing::get,
 };
 use base64::{Engine as _, engine::general_purpose};
 use clap::Parser;
 use futures_util::{SinkExt, StreamExt};
+use include_dir::{Dir, include_dir};
 use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 use rand::distr::{Alphanumeric, SampleString};
 use serde::Deserialize;
@@ -29,7 +31,8 @@ use tokio::sync::mpsc;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing::{debug, error, info};
 
-const INDEX_HTML: &str = include_str!("../static/index.html");
+static STATIC_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/static");
+
 const CONFIG_FILE_NAME: &str = ".browser-terminalrc";
 const DEFAULT_USERNAME: &str = "admin";
 const GENERATED_PASSWORD_LEN: usize = 24;
@@ -83,9 +86,9 @@ async fn main() -> Result<()> {
     );
 
     let app = Router::new()
-        .route("/", get(index))
         .route("/ws/{channel}", get(ws_handler))
         .route("/healthz", get(|| async { "ok" }))
+        .fallback(static_handler)
         .layer(middleware::from_fn_with_state(
             AppState {
                 auth: auth.clone(),
@@ -476,11 +479,41 @@ fn basic_auth_challenge() -> Response {
         .into_response()
 }
 
-async fn index() -> impl IntoResponse {
-    (
-        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
-        Html(INDEX_HTML),
-    )
+async fn static_handler(uri: Uri) -> Response {
+    let Some(path) = static_asset_path(&uri) else {
+        return static_not_found();
+    };
+    let Some(file) = STATIC_DIR.get_file(path) else {
+        return static_not_found();
+    };
+
+    let content_type = mime_guess::from_path(path).first_or_octet_stream();
+    let mut response = Response::new(Body::from(file.contents()));
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_str(content_type.as_ref())
+            .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
+    );
+    response
+}
+
+fn static_asset_path(uri: &Uri) -> Option<&str> {
+    let path = uri.path().trim_start_matches('/');
+    let path = if path.is_empty() { "index.html" } else { path };
+
+    if path.contains('\\')
+        || path
+            .split('/')
+            .any(|segment| segment == "." || segment == "..")
+    {
+        return None;
+    }
+
+    Some(path)
+}
+
+fn static_not_found() -> Response {
+    (StatusCode::NOT_FOUND, "404 Not Found").into_response()
 }
 
 async fn ws_handler(ws: WebSocketUpgrade, Path(channel): Path<String>) -> Response {
@@ -784,6 +817,38 @@ mod tests {
 
         assert_eq!(config.username.as_deref(), Some("admin"));
         assert_eq!(config.password.as_deref(), Some("fixed-password"));
+    }
+
+    #[test]
+    fn static_asset_path_maps_root_to_index() {
+        let uri = "/".parse::<Uri>().unwrap();
+
+        assert_eq!(static_asset_path(&uri), Some("index.html"));
+    }
+
+    #[test]
+    fn static_asset_path_rejects_parent_segments() {
+        let uri = "/../Cargo.toml".parse::<Uri>().unwrap();
+
+        assert_eq!(static_asset_path(&uri), None);
+    }
+
+    #[test]
+    fn static_dir_embeds_index_html() {
+        assert!(STATIC_DIR.get_file("index.html").is_some());
+    }
+
+    #[test]
+    fn static_dir_embeds_frontend_modules() {
+        assert!(STATIC_DIR.get_file("app.js").is_some());
+        assert!(STATIC_DIR.get_file("js/terminal-store.js").is_some());
+        assert!(
+            STATIC_DIR
+                .get_file("js/components/connection-status.js")
+                .is_some()
+        );
+        assert!(STATIC_DIR.get_file("js/config.js").is_some());
+        assert!(STATIC_DIR.get_file("js/socket.js").is_some());
     }
 
     fn basic_auth_header(username: &str, password: &str) -> HeaderValue {
