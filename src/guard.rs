@@ -5,13 +5,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-use crate::{auth::BasicAuth, security::SecurityPolicy};
-
-#[derive(Clone, Debug)]
-pub(crate) struct AppState {
-    pub(crate) auth: BasicAuth,
-    pub(crate) security: SecurityPolicy,
-}
+use crate::state::AppState;
 
 pub(crate) async fn security_middleware(
     State(state): State<AppState>,

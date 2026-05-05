@@ -61,8 +61,8 @@ impl SecurityPolicy {
 pub(crate) fn cors_layer(security: SecurityPolicy) -> CorsLayer {
     CorsLayer::new()
         .allow_origin(security.allow_origin())
-        .allow_methods([Method::GET])
-        .allow_headers([header::AUTHORIZATION])
+        .allow_methods([Method::GET, Method::POST])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
         .allow_credentials(true)
 }
 

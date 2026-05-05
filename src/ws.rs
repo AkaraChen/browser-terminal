@@ -3,7 +3,7 @@ use std::sync::mpsc as std_mpsc;
 use anyhow::{Context, Result};
 use axum::{
     extract::{
-        Path, WebSocketUpgrade,
+        Path, State, WebSocketUpgrade,
         ws::{Message, WebSocket},
     },
     response::Response,
@@ -14,20 +14,30 @@ use serde::Deserialize;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 
-use crate::pty::{PtyProcess, spawn_pty_reader, spawn_pty_writer};
+use crate::{
+    pty::{PtyProcess, spawn_pty_reader, spawn_pty_writer},
+    session::SessionStore,
+    state::AppState,
+};
 
-pub(crate) async fn ws_handler(ws: WebSocketUpgrade, Path(channel): Path<String>) -> Response {
+pub(crate) async fn ws_handler(
+    State(state): State<AppState>,
+    ws: WebSocketUpgrade,
+    Path(channel): Path<String>,
+) -> Response {
     ws.on_upgrade(move |socket| async move {
-        if let Err(err) = handle_socket(socket, channel).await {
+        if let Err(err) = handle_socket(socket, channel, state.sessions).await {
             error!(error = %err, "terminal session failed");
         }
     })
 }
 
-async fn handle_socket(socket: WebSocket, channel: String) -> Result<()> {
+async fn handle_socket(socket: WebSocket, channel: String, sessions: SessionStore) -> Result<()> {
     info!(%channel, "opening terminal session");
 
-    let pty = PtyProcess::spawn().context("failed to spawn pty")?;
+    let start_dir = sessions.take_start_dir(&channel);
+    let pty = PtyProcess::spawn(start_dir.as_deref()).context("failed to spawn pty")?;
+    sessions.register(channel.clone(), pty.process_id);
     let mut pty_control = pty.control;
     let (pty_output_tx, mut pty_output_rx) = mpsc::channel::<Vec<u8>>(256);
     let (pty_input_tx, pty_input_rx) = std_mpsc::channel::<Vec<u8>>();
@@ -63,8 +73,11 @@ async fn handle_socket(socket: WebSocket, channel: String) -> Result<()> {
                         }
                     }
                     Ok(Message::Text(text)) => {
-                        if let Some(resize) = parse_resize_message(&text)? {
-                            pty_control.resize(resize)?;
+                        if let Some(resize) = parse_resize_message(&text) {
+                            if let Err(err) = pty_control.resize(resize) {
+                                debug!(%channel, error = %err, "failed to resize pty");
+                                break;
+                            }
                         } else if pty_input_tx.send(text.as_bytes().to_vec()).is_err() {
                             break;
                         }
@@ -81,6 +94,7 @@ async fn handle_socket(socket: WebSocket, channel: String) -> Result<()> {
     }
 
     drop(pty_input_tx);
+    sessions.unregister(&channel, pty.process_id);
     if let Err(err) = pty_control.kill_child() {
         debug!(%channel, error = %err, "failed to kill child process");
     }
@@ -89,21 +103,21 @@ async fn handle_socket(socket: WebSocket, channel: String) -> Result<()> {
     Ok(())
 }
 
-fn parse_resize_message(text: &str) -> Result<Option<PtySize>> {
+fn parse_resize_message(text: &str) -> Option<PtySize> {
     let Ok(message) = serde_json::from_str::<ClientMessage>(text) else {
-        return Ok(None);
+        return None;
     };
 
     match message {
         ClientMessage::Resize { cols, rows } => {
             let cols = cols.clamp(2, 512);
             let rows = rows.clamp(2, 512);
-            Ok(Some(PtySize {
+            Some(PtySize {
                 rows,
                 cols,
                 pixel_width: 0,
                 pixel_height: 0,
-            }))
+            })
         }
     }
 }

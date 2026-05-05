@@ -1,6 +1,7 @@
 use std::{
     env,
     io::{self, Read, Write},
+    path::Path,
     sync::mpsc as std_mpsc,
     thread,
 };
@@ -11,6 +12,7 @@ use tokio::sync::mpsc;
 
 pub(crate) struct PtyProcess {
     pub(crate) control: PtyControl,
+    pub(crate) process_id: Option<u32>,
     pub(crate) reader: Box<dyn Read + Send>,
     pub(crate) writer: Box<dyn Write + Send>,
 }
@@ -21,7 +23,7 @@ pub(crate) struct PtyControl {
 }
 
 impl PtyProcess {
-    pub(crate) fn spawn() -> Result<Self> {
+    pub(crate) fn spawn(start_dir: Option<&Path>) -> Result<Self> {
         let pty_system = native_pty_system();
         let pair = pty_system.openpty(PtySize {
             rows: 24,
@@ -34,14 +36,20 @@ impl PtyProcess {
         let mut command = CommandBuilder::new(shell);
         command.env("TERM", "xterm-256color");
         command.env("COLORTERM", "truecolor");
-        if let Some(home) = dirs::home_dir() {
-            command.cwd(home);
+        let cwd = start_dir
+            .filter(|path| path.is_dir())
+            .map(Path::to_path_buf)
+            .or_else(|| dirs::home_dir().filter(|path| path.is_dir()))
+            .or_else(|| env::current_dir().ok());
+        if let Some(cwd) = cwd {
+            command.cwd(cwd);
         }
 
         let child = pair
             .slave
             .spawn_command(command)
             .context("failed to spawn shell")?;
+        let process_id = child.process_id();
         drop(pair.slave);
 
         let reader = pair.master.try_clone_reader()?;
@@ -52,6 +60,7 @@ impl PtyProcess {
                 master: pair.master,
                 child,
             },
+            process_id,
             reader,
             writer,
         })

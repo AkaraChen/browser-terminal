@@ -164,8 +164,23 @@ export function terminalStore() {
             );
         },
 
-        openNewTab() {
-            window.open(newChannelUrl().toString(), "_blank", "noopener");
+        async openNewTab() {
+            try {
+                const response = await fetch("/api/windows", {
+                    method: "POST",
+                    headers: {
+                        "content-type": "application/json",
+                    },
+                    body: JSON.stringify({ channel: this.channelId }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(await response.text());
+                }
+            } catch (error) {
+                console.error("failed to open terminal window", error);
+                window.open(newChannelUrl().toString(), "_blank", "noopener");
+            }
         },
 
         syncDocumentTitle(title) {

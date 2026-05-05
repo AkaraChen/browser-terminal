@@ -4,7 +4,8 @@ A small local terminal server that lets the browser act as a terminal window man
 
 The Rust backend serves a single HTML page and forwards WebSocket traffic to an
 independent PTY session. The frontend uses Xterm.js, reads a `channel` query
-parameter, and opens each new browser tab as a separate terminal session.
+parameter, and asks the backend to open each new browser window as a separate
+terminal session.
 Files under `static/` are embedded into the Rust binary at build time.
 The frontend entrypoint is `static/app.js`, split into ES modules under
 `static/js/`, with Alpine.js stores and components handling the browser UI
@@ -18,7 +19,8 @@ bindings.
 - Alpine.js UI bindings with frontend scripts split into ES modules
 - One PTY session per WebSocket connection
 - `?channel=<id>` URL-based session identity
-- New-tab button for opening a fresh terminal session
+- New-window button for opening a fresh terminal session in the current
+  session's working directory
 - Settings dialog for terminal font and font size
 - Nerd Font loading via `@xterm/addon-web-fonts`
 - Settings persisted in `localStorage`
@@ -34,7 +36,7 @@ bindings.
 cargo run
 ```
 
-Then open:
+The server opens the browser automatically. You can also open it manually:
 
 ```text
 http://127.0.0.1:3000/?channel=main

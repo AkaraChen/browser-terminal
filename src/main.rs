@@ -1,22 +1,35 @@
+mod api;
 mod auth;
+mod browser;
 mod cli;
 mod guard;
 mod pty;
 mod security;
+mod session;
+mod state;
 mod static_assets;
 mod ws;
 
 use anyhow::{Context, Result};
-use axum::{Router, http::HeaderValue, middleware, routing::get};
+use axum::{
+    Router,
+    http::HeaderValue,
+    middleware,
+    routing::{get, post},
+};
 use clap::Parser;
 use std::net::IpAddr;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::{
+    api::new_window_handler,
     auth::BasicAuth,
+    browser::BrowserLauncher,
     cli::Args,
-    guard::{AppState, security_middleware},
+    guard::security_middleware,
     security::{SecurityPolicy, cors_layer, origin_host_is_loopback},
+    session::SessionStore,
+    state::AppState,
     static_assets::static_handler,
     ws::ws_handler,
 };
@@ -42,22 +55,27 @@ async fn main() -> Result<()> {
         args.dangerous_allow_all_host,
     ))
     .context("failed to load Basic Auth configuration")?;
-
     let security = SecurityPolicy::new(
         args.cors_origin.clone(),
         args.dangerous_allow_all_host,
         local_addr.port(),
     );
+    let browser = BrowserLauncher::new(local_addr);
+    let state = AppState {
+        auth: auth.clone(),
+        browser,
+        security: security.clone(),
+        sessions: SessionStore::default(),
+    };
 
     let app = Router::new()
         .route("/ws/{channel}", get(ws_handler))
+        .route("/api/windows", post(new_window_handler))
         .route("/healthz", get(|| async { "ok" }))
         .fallback(static_handler)
+        .with_state(state.clone())
         .layer(middleware::from_fn_with_state(
-            AppState {
-                auth: auth.clone(),
-                security: security.clone(),
-            },
+            state.clone(),
             security_middleware,
         ))
         .layer(cors_layer(security.clone()));
@@ -74,6 +92,10 @@ async fn main() -> Result<()> {
         println!("basic auth: disabled for loopback listener");
     }
     println!("allowed host/origin policy: {}", security.description());
+    println!("browser url: {}", state.browser.root_url());
+    if let Err(err) = state.browser.open_root() {
+        warn!(error = %err, "failed to open browser on startup");
+    }
     info!(%local_addr, "server started");
 
     axum::serve(listener, app).await.context("server failed")
