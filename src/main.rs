@@ -596,20 +596,28 @@ struct PtyControl {
 impl PtyProcess {
     fn spawn() -> Result<Self> {
         let pty_system = native_pty_system();
-        let pair = pty_system.openpty(PtySize {
-            rows: 24,
-            cols: 80,
-            pixel_width: 0,
-            pixel_height: 0,
-        })?;
+        let pair = pty_system
+            .openpty(PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .context("failed to open pty")?;
 
-        let shell = env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
-        let mut command = CommandBuilder::new(shell);
+        let shell = if cfg!(windows) {
+            env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string())
+        } else {
+            env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
+        };
+        let mut command = CommandBuilder::new(&shell);
         command.env("TERM", "xterm-256color");
         command.env("COLORTERM", "truecolor");
         if let Some(home) = dirs::home_dir() {
-            command.cwd(home);
+            command.cwd(&home);
         }
+
+        info!(%shell, "spawning pty shell");
 
         let child = pair
             .slave
@@ -617,8 +625,14 @@ impl PtyProcess {
             .context("failed to spawn shell")?;
         drop(pair.slave);
 
-        let reader = pair.master.try_clone_reader()?;
-        let writer = pair.master.take_writer()?;
+        let reader = pair
+            .master
+            .try_clone_reader()
+            .context("failed to clone pty reader")?;
+        let writer = pair
+            .master
+            .take_writer()
+            .context("failed to take pty writer")?;
 
         Ok(Self {
             control: PtyControl {
