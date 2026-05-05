@@ -14,6 +14,7 @@ parameter, and opens each new browser tab as a separate terminal session.
 - `?channel=<id>` URL-based session identity
 - New-tab button for opening a fresh terminal session
 - Settings dialog for terminal font and font size
+- Nerd Font loading via `@xterm/addon-web-fonts`
 - Settings persisted in `localStorage`
 - Live settings sync across open tabs via the browser `storage` event
 - Window title sync from Xterm title updates
@@ -55,5 +56,7 @@ Shells start in the user's home directory. The PTY implementation uses
 - Tokio
 - portable-pty
 - Xterm.js
+- Xterm.js Web Fonts addon
 - Tailwind CSS CDN
 - LobeHub Icons static SVG CDN
+- Nerd Fonts via jsDelivr
